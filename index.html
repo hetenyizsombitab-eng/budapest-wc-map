@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Budapest WC Térkép</title>
+  <meta name="description" content="Budapest nyilvános WC-i egy térképen: nyitvatartás, ár, akadálymentesség, legközelebbi nyitva tartó WC.">
+  <meta name="theme-color" content="#0f6b75">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="WC Térkép">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img src="icons/icon-192.png" alt="" width="32" height="32">
+      <div>
+        <h1>Budapest WC Térkép</h1>
+        <p id="result-count" class="subtitle">Betöltés…</p>
+      </div>
+    </div>
+    <div class="searchbox">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.5 3a7.5 7.5 0 0 1 5.96 12.05l4.25 4.24-1.42 1.42-4.24-4.25A7.5 7.5 0 1 1 10.5 3Zm0 2a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11Z"/></svg>
+      <input id="search" type="search" placeholder="Keresés: tér, utca, metró…" autocomplete="off" enterkeyhint="search" aria-label="Keresés">
+      <button id="search-clear" class="icon-btn small hidden" aria-label="Keresés törlése">✕</button>
+    </div>
+    <div id="chips" class="chips" role="toolbar" aria-label="Gyorsszűrők">
+      <button class="chip" data-filter="openNow" aria-pressed="false">Most nyitva</button>
+      <button class="chip" data-filter="free" aria-pressed="false">Ingyenes</button>
+      <button class="chip" data-filter="h24" aria-pressed="false">24 órás</button>
+      <button class="chip" data-filter="accessible" aria-pressed="false">♿ Akadálymentes</button>
+      <select id="district" class="chip chip-select" aria-label="Kerület">
+        <option value="">Minden kerület</option>
+      </select>
+      <button id="reset-filters" class="chip chip-reset hidden">Törlés</button>
+    </div>
+  </header>
+
+  <main>
+    <section id="view-map" class="view">
+      <div id="map" aria-label="Térkép"></div>
+      <div class="fabs">
+        <button id="btn-locate" class="fab" aria-label="Saját helyzetem">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8Zm-1-7h2v3.06A8 8 0 0 1 19.94 11H23v2h-3.06A8 8 0 0 1 13 19.94V23h-2v-3.06A8 8 0 0 1 4.06 13H1v-2h3.06A8 8 0 0 1 11 4.06V1Zm1 5a6 6 0 1 0 0 12 6 6 0 0 0 0-12Z"/></svg>
+        </button>
+      </div>
+      <button id="btn-nearest" class="cta">
+        <span class="cta-icon">🚻</span> Legközelebbi nyitva tartó WC
+      </button>
+    </section>
+
+    <section id="view-list" class="view hidden" aria-label="Lista">
+      <div class="list-head">
+        <label for="sort">Rendezés</label>
+        <select id="sort">
+          <option value="distance">Távolság</option>
+          <option value="name">Név</option>
+          <option value="district">Kerület</option>
+        </select>
+      </div>
+      <ul id="list" class="list"></ul>
+    </section>
+  </main>
+
+  <nav class="tabbar" aria-label="Nézetek">
+    <button class="tab active" data-view="map" aria-current="page">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4.5 9 2 3 4.5v17.5l6-2.5 6 2.5 6-2.5V2l-6 2.5Zm-5 .06 4 1.67v13.21l-4-1.67V4.56ZM5 5.83l3-1.25v13.2l-3 1.25V5.83Zm14 12.34-3 1.25V6.22l3-1.25v13.2Z"/></svg>
+      <span>Térkép</span>
+    </button>
+    <button class="tab" data-view="list">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h2v2H4V5Zm4 0h12v2H8V5Zm-4 6h2v2H4v-2Zm4 0h12v2H8v-2Zm-4 6h2v2H4v-2Zm4 0h12v2H8v-2Z"/></svg>
+      <span>Lista</span>
+    </button>
+    <button class="tab" data-view="info">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20Zm0 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16Zm-1 6h2v7h-2v-7Zm0-3h2v2h-2V7Z"/></svg>
+      <span>Infó</span>
+    </button>
+  </nav>
+
+  <!-- Részletek (alsó lap) -->
+  <div id="sheet-backdrop" class="backdrop hidden"></div>
+  <aside id="sheet" class="sheet" aria-hidden="true" role="dialog" aria-labelledby="sheet-title">
+    <div class="sheet-handle"></div>
+    <div id="sheet-body"></div>
+  </aside>
+
+  <!-- Infó -->
+  <aside id="info" class="sheet" aria-hidden="true" role="dialog" aria-labelledby="info-title">
+    <div class="sheet-handle"></div>
+    <div class="sheet-inner">
+      <div class="sheet-header">
+        <h2 id="info-title">A térképről</h2>
+        <button class="icon-btn" data-close aria-label="Bezárás">✕</button>
+      </div>
+      <p>Budapest nyilvános, főként fővárosi üzemeltetésű WC-i egy helyen. A „Most nyitva” állapotot a budapesti idő és a megadott nyitvatartás alapján számolja az alkalmazás.</p>
+      <h3>Jelölések</h3>
+      <ul class="legend">
+        <li><span class="dot dot-open"></span> Most nyitva</li>
+        <li><span class="dot dot-closed"></span> Most zárva</li>
+        <li><span class="dot dot-unknown"></span> Nincs nyitvatartási adat</li>
+        <li><span class="dot dot-free">€</span> Ingyenes (zöld keret)</li>
+        <li><span class="badge-acc">♿</span> Akadálymentes</li>
+      </ul>
+      <h3>Tippek</h3>
+      <ul class="tips">
+        <li>Telefonon add hozzá a kezdőképernyőhöz, így appként indul, és a már betöltött adatok net nélkül is elérhetők.</li>
+        <li>A nyári nyitvatartás május–szeptember, a téli október–április között érvényes.</li>
+        <li>A helyadatok tájékoztató jellegűek, ellenőrizd a helyszínen.</li>
+      </ul>
+      <p class="muted small">Adatok: Budapest Főváros nyilvános WC-listája. Térkép: © OpenStreetMap közreműködők, © CARTO.</p>
+    </div>
+  </aside>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <noscript><p class="noscript">Az alkalmazáshoz JavaScript szükséges.</p></noscript>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
